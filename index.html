@@ -10,7 +10,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/chroma-js@2.4.2/chroma.min.js"></script>
   <style>
-    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #f0f0f0;
+    }
     #map { height: 100%; width: 100%; }
 
     #title {
@@ -40,20 +45,38 @@
 
     #legend {
       position: absolute;
-      bottom: 20px;
-      left: 10px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+      text-align: center;
+      width: 160px;
+      z-index: 1000;
+    }
+
+    #legend h4 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     #colorbar {
-      height: 12px;
-      width: 160px;
-      margin-bottom: 5px;
+      height: 14px;
+      width: 140px;
+      margin: 0 auto 8px auto;
       border-radius: 4px;
+      border: 1px solid #aaa;
+    }
+
+    .legend-values {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: monospace;
     }
   </style>
 </head>
@@ -74,21 +97,25 @@
 
   <div id="map"></div>
 
-  <div id="legend" style="display:none;">
+  <div id="legend">
+    <h4>Legend</h4>
     <div id="colorbar"></div>
-    <div><span id="minVal">min</span> – <span id="maxVal">max</span></div>
+    <div class="legend-values">
+      <span id="minVal">min</span>
+      <span id="maxVal">max</span>
+    </div>
   </div>
 
   <script>
     const map = L.map('map').setView([0, 0], 2);
 
-    // --- Base layers ---
+    // --- Base OSM ---
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Optional temperature regime overlay (from WorldClim WMS)
+    // Optional temperature regime overlay (WorldClim)
     const strataLayer = L.tileLayer.wms("https://ows.worldclim.org/geoserver/wms", {
       layers: 'wc2.1_10m_tavg',
       format: 'image/png',
@@ -109,7 +136,6 @@
 
     const datasetSelect = document.getElementById('datasetSelect');
     const featureSelect = document.getElementById('featureSelect');
-    const legendDiv = document.getElementById('legend');
     const colorbar = document.getElementById('colorbar');
     const minVal = document.getElementById('minVal');
     const maxVal = document.getElementById('maxVal');
@@ -136,7 +162,6 @@
             map.removeLayer(geojsonLayer);
           }
 
-          // detect numeric fields
           const props = data.features[0].properties;
           const numericKeys = Object.keys(props).filter(k => typeof props[k] === 'number');
 
@@ -172,7 +197,7 @@
         });
     }
 
-    // --- Update coloring + legend ---
+    // --- Update color + legend ---
     function updateColors() {
       if (!geojsonLayer || !currentFeature) return;
 
@@ -187,7 +212,6 @@
 
       minVal.textContent = min.toFixed(2);
       maxVal.textContent = max.toFixed(2);
-      legendDiv.style.display = "block";
 
       geojsonLayer.eachLayer(layer => {
         const props = layer.feature.properties;
@@ -201,7 +225,7 @@
         }
       });
 
-      // dynamic colorbar
+      // Update colorbar gradient
       const gradient = [];
       for (let i = 0; i <= 100; i += 5) {
         gradient.push(colorScale(i / 100).hex());
@@ -209,7 +233,7 @@
       colorbar.style.background = `linear-gradient(to right, ${gradient.join(',')})`;
     }
 
-    // Load the initial dataset
+    // Load initial dataset
     loadDataset();
   </script>
 </body>
