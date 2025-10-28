@@ -10,12 +10,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/chroma-js@2.4.2/chroma.min.js"></script>
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: system-ui, sans-serif;
-    }
+    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
     #map { height: 100%; width: 100%; }
+
     #title {
       position: absolute;
       top: 10px;
@@ -28,16 +25,19 @@
       font-weight: bold;
       z-index: 1000;
     }
+
     #controls {
       position: absolute;
       top: 60px;
       left: 10px;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.95);
       padding: 10px;
       border-radius: 8px;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
       z-index: 1000;
+      width: 220px;
     }
+
     #legend {
       position: absolute;
       bottom: 20px;
@@ -48,22 +48,33 @@
       font-size: 12px;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
     }
+
     #colorbar {
-      height: 10px;
-      width: 150px;
-      background: linear-gradient(to right, #0000ff, #ff0000);
+      height: 12px;
+      width: 160px;
       margin-bottom: 5px;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
   <div id="title">CyGNSSnet Web View</div>
+
   <div id="controls">
-    <label for="featureSelect"><b>Color by feature:</b></label><br>
+    <label><b>Dataset:</b></label><br>
+    <select id="datasetSelect">
+      <option value="raw">Raw Features</option>
+      <option value="shap">SHAP Values</option>
+    </select>
+    <br><br>
+
+    <label><b>Feature:</b></label><br>
     <select id="featureSelect"></select>
   </div>
+
   <div id="map"></div>
-  <div id="legend">
+
+  <div id="legend" style="display:none;">
     <div id="colorbar"></div>
     <div><span id="minVal">min</span> – <span id="maxVal">max</span></div>
   </div>
@@ -77,7 +88,7 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Optional strata / temperature overlay (from WorldClim WMS)
+    // Optional temperature regime overlay (from WorldClim WMS)
     const strataLayer = L.tileLayer.wms("https://ows.worldclim.org/geoserver/wms", {
       layers: 'wc2.1_10m_tavg',
       format: 'image/png',
@@ -85,74 +96,102 @@
       attribution: "WorldClim"
     }).addTo(map);
 
-    let geojsonLayer;
-    let currentFeature = null;
+    const datasetFiles = {
+      raw: 'raw_features.geojson',
+      shap: 'shap_features.geojson'
+    };
+
+    const colorScale = chroma.scale('Spectral').mode('lab');
+    let geojsonLayer = null;
     let geoData = null;
+    let currentDataset = 'raw';
+    let currentFeature = null;
 
-    const colorScale = chroma.scale('Spectral').mode('lab'); // good default palette
+    const datasetSelect = document.getElementById('datasetSelect');
+    const featureSelect = document.getElementById('featureSelect');
+    const legendDiv = document.getElementById('legend');
+    const colorbar = document.getElementById('colorbar');
+    const minVal = document.getElementById('minVal');
+    const maxVal = document.getElementById('maxVal');
 
-    // --- Load GeoJSON ---
-    fetch('raw_features.geojson')
-      .then(r => r.json())
-      .then(data => {
-        geoData = data;
+    datasetSelect.addEventListener('change', () => {
+      currentDataset = datasetSelect.value;
+      loadDataset();
+    });
 
-        // Detect numeric properties for dropdown
-        const sampleProps = data.features[0].properties;
-        const numericKeys = Object.keys(sampleProps).filter(k => typeof sampleProps[k] === "number");
+    featureSelect.addEventListener('change', () => {
+      currentFeature = featureSelect.value;
+      updateColors();
+    });
 
-        const select = document.getElementById('featureSelect');
-        numericKeys.forEach(k => {
-          const opt = document.createElement('option');
-          opt.value = k;
-          opt.textContent = k;
-          select.appendChild(opt);
-        });
+    // --- Load dataset ---
+    function loadDataset() {
+      const file = datasetFiles[currentDataset];
+      fetch(file)
+        .then(r => r.json())
+        .then(data => {
+          geoData = data;
 
-        select.addEventListener('change', e => {
-          currentFeature = e.target.value;
-          updateColors();
-        });
+          if (geojsonLayer) {
+            map.removeLayer(geojsonLayer);
+          }
 
-        // Initially, no color by feature
-        geojsonLayer = L.geoJSON(geoData, {
-          pointToLayer: (feature, latlng) =>
-            L.circleMarker(latlng, {
+          // detect numeric fields
+          const props = data.features[0].properties;
+          const numericKeys = Object.keys(props).filter(k => typeof props[k] === 'number');
+
+          featureSelect.innerHTML = "";
+          numericKeys.forEach(k => {
+            const opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = k + (currentDataset === "raw" ? "_raw" : "_shap");
+            featureSelect.appendChild(opt);
+          });
+
+          currentFeature = featureSelect.value;
+
+          geojsonLayer = L.geoJSON(geoData, {
+            pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
               radius: 5,
               color: '#333',
               fillColor: '#555',
               fillOpacity: 0.7,
               weight: 1
             }),
-          onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            const popup = Object.entries(props)
-              .map(([k, v]) => `<b>${k}</b>: ${v}`)
-              .join('<br>');
-            layer.bindPopup(popup);
-          }
-        }).addTo(map);
+            onEachFeature: (feature, layer) => {
+              const props = feature.properties;
+              const popup = Object.entries(props)
+                .map(([k, v]) => `<b>${k}</b>: ${v}`)
+                .join('<br>');
+              layer.bindPopup(popup);
+            }
+          }).addTo(map);
 
-        map.fitBounds(geojsonLayer.getBounds());
-      });
+          map.fitBounds(geojsonLayer.getBounds());
+          updateColors();
+        });
+    }
 
+    // --- Update coloring + legend ---
     function updateColors() {
       if (!geojsonLayer || !currentFeature) return;
 
-      // Compute min/max for selected feature
       const values = geoData.features
-        .map(f => f.properties[currentFeature])
+        .map(f => f.properties[currentFeature.replace(/_(raw|shap)$/, '')] ?? f.properties[currentFeature])
         .filter(v => typeof v === "number" && !isNaN(v));
+
+      if (values.length === 0) return;
 
       const min = Math.min(...values);
       const max = Math.max(...values);
 
-      document.getElementById('minVal').textContent = min.toFixed(2);
-      document.getElementById('maxVal').textContent = max.toFixed(2);
+      minVal.textContent = min.toFixed(2);
+      maxVal.textContent = max.toFixed(2);
+      legendDiv.style.display = "block";
 
-      // Create color gradient from min→max
       geojsonLayer.eachLayer(layer => {
-        const val = layer.feature.properties[currentFeature];
+        const props = layer.feature.properties;
+        const val = props[currentFeature.replace(/_(raw|shap)$/, '')] ?? props[currentFeature];
         if (typeof val === "number" && !isNaN(val)) {
           const t = (val - min) / (max - min);
           const color = colorScale(t).hex();
@@ -162,15 +201,16 @@
         }
       });
 
-      // Update colorbar visually
-      const cbar = document.getElementById('colorbar');
+      // dynamic colorbar
       const gradient = [];
       for (let i = 0; i <= 100; i += 5) {
-        const t = i / 100;
-        gradient.push(colorScale(t).hex());
+        gradient.push(colorScale(i / 100).hex());
       }
-      cbar.style.background = `linear-gradient(to right, ${gradient.join(',')})`;
+      colorbar.style.background = `linear-gradient(to right, ${gradient.join(',')})`;
     }
+
+    // Load the initial dataset
+    loadDataset();
   </script>
 </body>
 </html>
