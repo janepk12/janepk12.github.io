@@ -2,33 +2,115 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>My Shapefile Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <title>Strata Visualization Map</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
   <style>
-    #map { height: 100vh; width: 100%; }
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .legend {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      line-height: 1.2em;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 12px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    }
+    .legend div {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+
   <script>
+    // Function to get a color for each strata value
+    function getColorForStrata(strataValue) {
+      // distribute 83 values evenly across color wheel
+      const hue = (strataValue * 4.3) % 360;
+      return `hsl(${hue}, 70%, 50%)`;
+    }
+
+    // Initialize map
     const map = L.map('map').setView([0, 0], 2);
+
+    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // load your shapefile (.zip) locally
-    fetch('data/shap.zip')
-      .then(res => res.arrayBuffer())
-      .then(buffer => shp(buffer))
-      .then(geojson => {
-        const layer = L.geoJSON(geojson, {
+    // Load GeoJSON
+    fetch('raw_features.geojson')
+      .then(response => response.json())
+      .then(data => {
+        const geojsonLayer = L.geoJSON(data, {
+          pointToLayer: (feature, latlng) => {
+            const strata = feature.properties.strata;
+            const color = getColorForStrata(strata);
+            return L.circleMarker(latlng, {
+              radius: 5,
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.8,
+              weight: 1
+            });
+          },
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(JSON.stringify(feature.properties));
+            const p = feature.properties;
+            const popup = `
+              <b>Strata:</b> ${p.strata}<br>
+              <b>REFLECTIVITY_dB:</b> ${p.REFLECTIVITY_dB}<br>
+              <b>Elevation:</b> ${p.elevation}<br>
+              <b>NDVI:</b> ${p.NDVI}<br>
+              <b>Slope:</b> ${p.slope}
+            `;
+            layer.bindPopup(popup);
           }
         }).addTo(map);
-        map.fitBounds(layer.getBounds());
+
+        // Zoom to layer bounds
+        map.fitBounds(geojsonLayer.getBounds());
+
+        // Create a legend showing color by strata number
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function () {
+          const div = L.DomUtil.create('div', 'legend');
+          div.innerHTML = '<b>Strata (1–83)</b><br>';
+          // show first 20 only to keep legend readable
+          const maxToShow = 20;
+          for (let i = 1; i <= Math.min(83, maxToShow); i++) {
+            const color = getColorForStrata(i);
+            div.innerHTML += `
+              <div>
+                <span class="legend-color" style="background:${color}"></span>
+                ${i}
+              </div>`;
+          }
+          if (83 > maxToShow) {
+            div.innerHTML += '<i>...and more up to 83</i>';
+          }
+          return div;
+        };
+        legend.addTo(map);
       });
   </script>
 </body>
