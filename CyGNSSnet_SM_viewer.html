@@ -42,6 +42,14 @@
       z-index: 1000;
       width: 220px;
     }
+     
+    #controls label {
+        display: inline-block;
+        margin-bottom: 4px;
+    }
+    #controls select, #controls input {
+        width: 100%;
+    }
 
     #legend {
       position: absolute;
@@ -78,21 +86,42 @@
       font-size: 12px;
       font-family: monospace;
     }
+    
+    #zoom-note {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #444;
+    }
+    #zoom-note kbd {
+      background: #f4f4f4;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
   <div id="title">CyGNSSnet Web View</div>
 
   <div id="controls">
-    <label><b>Dataset:</b></label><br>
+    <label for="datasetSelect"><b>Dataset:</b></label><br>
     <select id="datasetSelect">
       <option value="raw">Raw Features</option>
       <option value="shap">SHAP Values</option>
     </select>
     <br><br>
 
-    <label><b>Feature:</b></label><br>
+    <label for="featureSelect"><b>Feature:</b></label><br>
     <select id="featureSelect"></select>
+    <br><br>
+
+    <label for="opacitySlider"><b>Image Opacity:</b></label><br>
+    <input id="opacitySlider" type="range" min="0" max="1" step="0.05" value="0.7">
+    
   </div>
 
   <div id="map"></div>
@@ -100,28 +129,57 @@
   <div id="legend">
     <h4>Legend</h4>
     <div id="colorbar"></div>
-    <div class="legend-values">
+    <div class.legend-values">
       <span id="minVal">min</span>
       <span id="maxVal">max</span>
+    </div>
+
+    <div id="zoom-note">
+      <b>Tip:</b> Hold <kbd>Shift</kbd> + click and drag to zoom to an area.
     </div>
   </div>
 
   <script>
-    const map = L.map('map').setView([0, 0], 2);
+    const map = L.map('map', {
+        boxZoom: true,
+        minZoom: 2,
+        maxBounds: [
+            [-90, -180], // South-West corner
+            [90, 180]  // North-East corner
+        ]
+    }).setView([0, 0], 2);
 
-    // --- Base OSM ---
+    // --- Base Map Layers ---
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+      attribution: '&copy; OpenStreetMap contributors',
+      noWrap: true
+    }).addTo(map); // Add OSM by default
 
-    // Optional temperature regime overlay (WorldClim)
-    const strataLayer = L.tileLayer.wms("https://ows.worldclim.org/geoserver/wms", {
-      layers: 'wc2.1_10m_tavg',
-      format: 'image/png',
-      transparent: true,
-      attribution: "WorldClim"
-    }).addTo(map);
+    // --- MODIFICATION 1: Add WorldClim WMS layer ---
+    const worldClim = L.tileLayer.wms("https://ows.worldclim.org/geoserver/wms", {
+        layers: 'wc2.1_10m_tavg', // Avg temperature
+        format: 'image/png',
+        transparent: true,
+        attribution: "WorldClim"
+    });
+
+    // --- MODIFICATION 2: Define your custom image overlay ---
+    
+    // !!! PASTE YOUR BOUNDS FROM THE PYTHON SCRIPT HERE !!!
+    // Format: [ [South_Lat, West_Lng], [North_Lat, East_Lng] ]
+    const imageBounds = [ [-55.9, -150.1], [83.6, 179.9] ]; // <-- EXAMPLE: REPLACE THIS
+    
+    const imageOverlayLayer = L.imageOverlay(
+        'thz_4326.png',
+        imageBounds, 
+        { 
+            
+            opacity: 0.7, // Initial opacity, matches slider
+            interactive: true
+        }
+    ).addTo(map); // Add your image by default
+    
 
     const datasetFiles = {
       raw: 'raw_features.geojson',
@@ -129,7 +187,7 @@
     };
 
     const colorScale = chroma.scale('Spectral').mode('lab');
-    let geojsonLayer = null;
+    let geojsonLayer = null; // This will hold your points
     let geoData = null;
     let currentDataset = 'raw';
     let currentFeature = null;
@@ -139,6 +197,18 @@
     const colorbar = document.getElementById('colorbar');
     const minVal = document.getElementById('minVal');
     const maxVal = document.getElementById('maxVal');
+    const opacitySlider = document.getElementById('opacitySlider');
+
+    // --- MODIFICATION 3: Opacity slider controls BOTH overlays ---
+    opacitySlider.addEventListener('input', () => {
+        const opacity = opacitySlider.value;
+        if (imageOverlayLayer) {
+            imageOverlayLayer.setOpacity(opacity);
+        }
+        if (worldClim) {
+            worldClim.setOpacity(opacity);
+        }
+    });
 
     datasetSelect.addEventListener('change', () => {
       currentDataset = datasetSelect.value;
@@ -160,6 +230,10 @@
 
           if (geojsonLayer) {
             map.removeLayer(geojsonLayer);
+            // We need to re-add it to the layer control if it's new
+            if (layerControl) {
+                layerControl.removeLayer(geojsonLayer);
+            }
           }
 
           const props = data.features[0].properties;
@@ -184,14 +258,26 @@
               weight: 1
             }),
             onEachFeature: (feature, layer) => {
-              const props = feature.properties;
-              const popup = Object.entries(props)
-                .map(([k, v]) => `<b>${k}</b>: ${v}`)
-                .join('<br>');
-              layer.bindPopup(popup);
+              layer.bindPopup(() => {
+                const props = feature.properties;
+                const baseFeatureName = currentFeature; 
+                const value = props[baseFeatureName];
+                const featureDisplayName = baseFeatureName + (currentDataset === "raw" ? "_raw" : "_shap");
+
+                if (typeof value === "number" && !isNaN(value)) {
+                    return `<b>${featureDisplayName}</b>: ${value.toFixed(4)}`;
+                } else {
+                    return `<b>${featureDisplayName}</b>: Not available`;
+                }
+              });
             }
           }).addTo(map);
 
+          // --- MODIFICATION 4: Add new data layer to layer control ---
+          if (layerControl) {
+             layerControl.addOverlay(geojsonLayer, "Data Points");
+          }
+          
           map.fitBounds(geojsonLayer.getBounds());
           updateColors();
         });
@@ -202,7 +288,7 @@
       if (!geojsonLayer || !currentFeature) return;
 
       const values = geoData.features
-        .map(f => f.properties[currentFeature.replace(/_(raw|shap)$/, '')] ?? f.properties[currentFeature])
+        .map(f => f.properties[currentFeature])
         .filter(v => typeof v === "number" && !isNaN(v));
 
       if (values.length === 0) return;
@@ -215,7 +301,7 @@
 
       geojsonLayer.eachLayer(layer => {
         const props = layer.feature.properties;
-        const val = props[currentFeature.replace(/_(raw|shap)$/, '')] ?? props[currentFeature];
+        const val = props[currentFeature];
         if (typeof val === "number" && !isNaN(val)) {
           const t = (val - min) / (max - min);
           const color = colorScale(t).hex();
@@ -224,14 +310,27 @@
           layer.setStyle({ color: '#ccc', fillColor: '#ccc' });
         }
       });
-
-      // Update colorbar gradient
+      
       const gradient = [];
       for (let i = 0; i <= 100; i += 5) {
         gradient.push(colorScale(i / 100).hex());
       }
       colorbar.style.background = `linear-gradient(to right, ${gradient.join(',')})`;
     }
+    
+    // --- MODIFICATION 5: Setup Layer Control ---
+    const baseMaps = {
+        "OpenStreetMap": osm
+    };
+    
+    const overlayMaps = {
+        "Your Custom Image": imageOverlayLayer,
+        "WorldClim Temp": worldClim,
+        // "Data Points" will be added in loadDataset()
+    };
+    
+    const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+    // --- END MODIFICATION ---
 
     // Load initial dataset
     loadDataset();
