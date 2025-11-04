@@ -51,6 +51,7 @@
         width: 100%;
     }
 
+    /* Existing data legend (top right) */
     #legend {
       position: absolute;
       top: 50%;
@@ -102,6 +103,78 @@
       font-family: monospace;
       font-size: 11px;
     }
+
+    /* */
+    #lcz-legend-container {
+      position: absolute;
+      bottom: 20px; /* Position bottom-left */
+      left: 20px;
+      z-index: 1000;
+    }
+
+    #lcz-legend-toggle {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 5px 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 10px;
+      width: 180px; /* Match legend width */
+      box-sizing: border-box; /* Include padding in width */
+    }
+
+    #lcz-legend-content {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+      width: 200px; /* Slightly wider for color swatches */
+      max-height: 45vh; /* Limit height with scroll */
+      overflow-y: auto;
+      text-align: left;
+    }
+
+    #lcz-legend-content h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    #lcz-legend-content h5 {
+      margin: 10px 0 5px 0;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    
+    #lcz-legend-content ul {
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    
+    #lcz-legend-content li {
+      font-size: 12px;
+      margin-bottom: 4px;
+      display: flex; /* For aligning color box and text */
+      align-items: center;
+    }
+
+    .lcz-color-box {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      border: 1px solid #888;
+      box-sizing: border-box;
+      flex-shrink: 0; /* Prevent shrinking when text is long */
+    }
+    /* */
+
   </style>
 </head>
 <body>
@@ -127,7 +200,7 @@
   <div id="map"></div>
 
   <div id="legend">
-    <h4>Legend</h4>
+    <h4>Data Legend</h4>
     <div id="colorbar"></div>
     <div class.legend-values">
       <span id="minVal">min</span>
@@ -138,6 +211,40 @@
       <b>Tip:</b> Hold <kbd>Shift</kbd> + click and drag to zoom to an area.
     </div>
   </div>
+
+  -->
+  <div id="lcz-legend-container">
+    <div id="lcz-legend-toggle">Local Climate Zones (Click to Hide)</div>
+    <div id="lcz-legend-content">
+      <h4>Local Climate Zones</h4>
+      
+      <h5>Built types</h5>
+      <ul>
+        <li><span class="lcz-color-box" style="background-color: #8C0000;"></span> 1 - Compact highrise</li>
+        <li><span class="lcz-color-box" style="background-color: #D10000;"></span> 2 - Compact midrise</li>
+        <li><span class="lcz-color-box" style="background-color: #FF0000;"></span> 3 - Compact lowrise</li>
+        <li><span class="lcz-color-box" style="background-color: #BA6B00;"></span> 4 - Open highrise</li>
+        <li><span class="lcz-color-box" style="background-color: #FF9E0D;"></span> 5 - Open midrise</li>
+        <li><span class="lcz-color-box" style="background-color: #FFFF00;"></span> 6 - Open lowrise</li>
+        <li><span class="lcz-color-box" style="background-color: #D8D8D8;"></span> 7 - Lightweight lowrise</li>
+        <li><span class="lcz-color-box" style="background-color: #F0E3D1;"></span> 8 - Large lowrise</li>
+        <li><span class="lcz-color-box" style="background-color: #838383;"></span> 9 - Sparsely built</li>
+        <li><span class="lcz-color-box" style="background-color: #1A1A1A;"></span> 10 - Heavy industry</li>
+      </ul>
+      
+      <h5>Land cover types</h5>
+      <ul>
+        <li><span class="lcz-color-box" style="background-color: #006A00;"></span> A - Dense trees</li>
+        <li><span class="lcz-color-box" style="background-color: #009900;"></span> B - Scattered trees</li>
+        <li><span class="lcz-color-box" style="background-color: #B4FF00;"></span> C - Bush, scrub</li>
+        <li><span class="lcz-color-box" style="background-color: #D8FF8A;"></span> D - Low plants</li>
+        <li><span class="lcz-color-box" style="background-color: #000000;"></span> E - Bare rock or paved</li>
+        <li><span class="lcz-color-box" style="background-color: #F5EEBA;"></span> F - Bare soil or sand</li>
+        <li><span class="lcz-color-box" style="background-color: #7AA2F9;"></span> G - Water</li>
+      </ul>
+    </div>
+  </div>
+  -->
 
   <script>
     const map = L.map('map', {
@@ -156,7 +263,6 @@
       noWrap: true
     }).addTo(map); // Add OSM by default
 
-    // --- MODIFICATION 1: Add WorldClim WMS layer ---
     const worldClim = L.tileLayer.wms("https://ows.worldclim.org/geoserver/wms", {
         layers: 'wc2.1_10m_tavg', // Avg temperature
         format: 'image/png',
@@ -164,21 +270,10 @@
         attribution: "WorldClim"
     });
 
-    // --- MODIFICATION 2: Define your custom image overlay ---
-    
-    // !!! PASTE YOUR BOUNDS FROM THE PYTHON SCRIPT HERE !!!
-    // Format: [ [South_Lat, West_Lng], [North_Lat, East_Lng] ]
-    const imageBounds = [ [-55.9, -150.1], [83.6, 179.9] ]; // <-- EXAMPLE: REPLACE THIS
-    
-    const imageOverlayLayer = L.imageOverlay(
-        'thz_4326.png',
-        imageBounds, 
-        { 
-            
-            opacity: 0.7, // Initial opacity, matches slider
-            interactive: true
-        }
-    ).addTo(map); // Add your image by default
+    const imageOverlayLayer = L.tileLayer.wms("https://lcz-generator.rub.de/tms/global-map-tiles/latest/{z}/{x}/{y}.png",{
+        interactive: true,
+        attribution: 'WUDAPT, CC-BY-SA 4.0' // Added attribution
+    }).addTo(map); // Add your image by default
     
 
     const datasetFiles = {
@@ -199,7 +294,6 @@
     const maxVal = document.getElementById('maxVal');
     const opacitySlider = document.getElementById('opacitySlider');
 
-    // --- MODIFICATION 3: Opacity slider controls BOTH overlays ---
     opacitySlider.addEventListener('input', () => {
         const opacity = opacitySlider.value;
         if (imageOverlayLayer) {
@@ -220,7 +314,6 @@
       updateColors();
     });
 
-    // --- Load dataset ---
     function loadDataset() {
       const file = datasetFiles[currentDataset];
       fetch(file)
@@ -230,7 +323,6 @@
 
           if (geojsonLayer) {
             map.removeLayer(geojsonLayer);
-            // We need to re-add it to the layer control if it's new
             if (layerControl) {
                 layerControl.removeLayer(geojsonLayer);
             }
@@ -273,7 +365,6 @@
             }
           }).addTo(map);
 
-          // --- MODIFICATION 4: Add new data layer to layer control ---
           if (layerControl) {
              layerControl.addOverlay(geojsonLayer, "Data Points");
           }
@@ -283,7 +374,6 @@
         });
     }
 
-    // --- Update color + legend ---
     function updateColors() {
       if (!geojsonLayer || !currentFeature) return;
 
@@ -318,22 +408,33 @@
       colorbar.style.background = `linear-gradient(to right, ${gradient.join(',')})`;
     }
     
-    // --- MODIFICATION 5: Setup Layer Control ---
     const baseMaps = {
         "OpenStreetMap": osm
     };
     
     const overlayMaps = {
-        "Your Custom Image": imageOverlayLayer,
+        "Local Climate Zones": imageOverlayLayer, // Renamed for clarity
         "WorldClim Temp": worldClim,
-        // "Data Points" will be added in loadDataset()
     };
     
     const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
-    // --- END MODIFICATION ---
 
-    // Load initial dataset
-    loadDataset();
+    // const lczLegendToggle = document.getElementById('lcz-legend-toggle');
+    const lczLegendContent = document.getElementById('lcz-legend-content');
+    let lczLegendVisible = true; // State variable
+
+    lczLegendToggle.addEventListener('click', () => {
+        if (lczLegendVisible) {
+            lczLegendContent.style.display = 'none';
+            lczLegendToggle.textContent = 'Local Climate Zones (Click to Show)';
+        } else {
+            lczLegendContent.style.display = 'block';
+            lczLegendToggle.textContent = 'Local Climate Zones (Click to Hide)';
+        }
+        lczLegendVisible = !lczLegendVisible; // Toggle state
+    });
+    // loadDataset();
   </script>
 </body>
 </html>
+```
