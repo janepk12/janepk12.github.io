@@ -52,7 +52,6 @@ a:hover {
 .header {
     padding: 60px 0 40px;
     text-align: center;
-    background-color: var(--header-bg);
 }
 
 .profile-image-container {
@@ -83,13 +82,22 @@ a:hover {
 .name {
     font-size: 2.5rem;
     font-weight: 600;
-    margin-bottom: 5px;
+    margin-bottom: 12px;
 }
 
 .title {
     font-size: 1.1rem;
     color: var(--secondary-text);
-    margin-bottom: 20px;
+    margin-bottom: 14px;
+}
+
+.keywords {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent-color);
+    margin-bottom: 28px;
 }
 
 .social-links {
@@ -104,8 +112,12 @@ a:hover {
 
 /* Sections */
 .section {
-    padding: 40px 0;
+    padding: 56px 0;
     border-bottom: 1px solid var(--border-color);
+}
+
+.section p + p {
+    margin-top: 16px;
 }
 
 .section:last-child {
@@ -114,7 +126,7 @@ a:hover {
 
 .section-title {
     font-size: 1.5rem;
-    margin-bottom: 20px;
+    margin-bottom: 32px;
     color: var(--text-color);
     border-left: 4px solid var(--accent-color);
     padding-left: 10px;
@@ -122,10 +134,14 @@ a:hover {
 
 /* Experience */
 .experience-item {
-    margin-bottom: 30px;
+    margin-bottom: 44px;
     display: grid;
     grid-template-columns: 120px 1fr;
-    gap: 20px;
+    gap: 24px;
+}
+
+.experience-item:last-child {
+    margin-bottom: 0;
 }
 
 .experience-item .date {
@@ -136,14 +152,15 @@ a:hover {
 
 .experience-item h3 {
     font-size: 1.1rem;
-    margin-bottom: 5px;
+    line-height: 1.45;
+    margin-bottom: 8px;
 }
 
 .experience-item .company {
     display: block;
     font-size: 0.95rem;
     color: var(--secondary-text);
-    margin-bottom: 10px;
+    margin-bottom: 14px;
     font-style: italic;
 }
 
@@ -151,12 +168,14 @@ a:hover {
 .projects-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
+    gap: 24px;
 }
 
 .project-card {
     background-color: var(--card-bg);
-    padding: 20px;
+    /* slightly see-through so the background pattern fades into the card */
+    background-color: color-mix(in srgb, var(--card-bg) 88%, transparent);
+    padding: 24px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
     transition: transform 0.2s ease;
@@ -167,7 +186,7 @@ a:hover {
 }
 
 .project-card h3 {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     font-size: 1.1rem;
 }
 
@@ -204,6 +223,7 @@ a:hover {
     display: grid;
     grid-template-columns: 240px 1fr;
     background-color: var(--card-bg);
+    background-color: color-mix(in srgb, var(--card-bg) 88%, transparent);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
@@ -223,20 +243,20 @@ a:hover {
 }
 
 .publication-body {
-    padding: 20px;
+    padding: 24px;
 }
 
 .publication-body h3 {
     font-size: 1.1rem;
     line-height: 1.4;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .publication-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 14px;
 }
 
 .badge {
@@ -253,22 +273,26 @@ a:hover {
     border-color: #2b8a3e;
 }
 
+.publication-body p + p {
+    margin-top: 0;
+}
+
 .publication-authors {
     font-size: 0.95rem;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .publication-venue {
     font-size: 0.9rem;
     font-style: italic;
     color: var(--secondary-text);
-    margin-bottom: 10px;
+    margin-bottom: 16px;
 }
 
 .publication-summary {
     font-size: 0.95rem;
     color: var(--secondary-text);
-    margin-bottom: 12px;
+    margin-bottom: 18px;
 }
 
 .publication-links {
